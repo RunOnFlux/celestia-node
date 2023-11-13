@@ -22,7 +22,6 @@ else
     fi
 fi
 
-
 echo ""
 echo "Starting Celestia Node...."
 celestia $NODE_TYPE start
