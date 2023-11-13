@@ -25,10 +25,11 @@ RUN uname -a &&\
     CGO_ENABLED=${CGO_ENABLED} GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     make build && make cel-key
 
-FROM docker.io/alpine:3.18.4
+FROM debian:buster-slim
 
 # Read here why UID 10001: https://github.com/hexops/dockerfile/blob/main/README.md#do-not-use-a-uid-below-10000
 ARG UID=10001
+ARG GID=10001
 ARG USER_NAME=celestia
 
 ENV CELESTIA_HOME=/home/${USER_NAME}
@@ -37,19 +38,16 @@ ENV CELESTIA_HOME=/home/${USER_NAME}
 ENV NODE_TYPE bridge
 ENV P2P_NETWORK mocha
 
-# hadolint ignore=DL3018
-RUN uname -a &&\
-    apk update && apk add --no-cache \
-        bash \
+RUN apt-get update && apt-get --assume-yes --no-install-recommends install \
         curl \
-        jq \
-    # Creates a user with $UID and $GID=$UID
-    && adduser ${USER_NAME} \
-        -D \
-        -g ${USER_NAME} \
-        -h ${CELESTIA_HOME} \
-        -s /sbin/nologin \
-        -u ${UID}
+        bash \
+        jq \ 
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*
+
+
+RUN groupadd --gid ${GID} celestia \
+  && useradd --create-home --no-log-init -u ${UID} -g ${GID} celestia
 
 # Copy in the binary
 COPY --from=builder /src/build/celestia /bin/celestia
@@ -57,9 +55,6 @@ COPY --from=builder /src/./cel-key /bin/cel-key
 
 COPY --chown=${USER_NAME}:${USER_NAME} docker/entrypoint.sh /opt/entrypoint.sh
 
-USER ${USER_NAME}
-
 EXPOSE 2121
 
 ENTRYPOINT [ "/bin/bash", "/opt/entrypoint.sh" ]
-CMD [ "celestia" ]
